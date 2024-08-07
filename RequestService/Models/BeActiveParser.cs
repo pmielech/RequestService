@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
+using RequestService.Mappers;
 
 namespace RequestService.Models;
 
@@ -9,12 +10,14 @@ public class BeActiveParser : IHtmlParser<GymPriceInfoType>
 {
   private string Name { get; set; }
   private string Url { get; set; }
+  private GymPriceInfoMapper _mapper;
   private IEnumerable<HtmlElementType> HtmlElementList { get; set; }
 
   public BeActiveParser()
   {
-    this.Name = "beActive";
-    this.Url = "https://www.ebeactive.pl/pl/oferta-r60.html";
+    Name = "beActive";
+    Url = "https://www.ebeactive.pl/pl/oferta-r60.html";
+    _mapper = new GymPriceInfoMapper(Name);
     // TODO: create the model to add description to specific xpath items 
     this.HtmlElementList = new List<HtmlElementType>(){
         new (){Name = "price", Xpath = "//*[@id='offer']/div/div[2]/div[2]/h3[2]/text()"},
@@ -37,70 +40,46 @@ public class BeActiveParser : IHtmlParser<GymPriceInfoType>
     if (match.Success)
     {
       result = decimal.Parse(match.Value);
-      Console.WriteLine(result);
     }
 
     return result;
   }
-// TODO: move the CreateFromHtmlElement function 
-  private GymPriceInfoType CreateFromHtmlElement(IEnumerable<HtmlElementType> htmlElementList)
+
+  private decimal ExtractNodeValue(ref HtmlDocument htmlDocument, string xpath)
   {
-    var newGymPriceInfo = new GymPriceInfoType();
-    decimal totalPrice = 0;
-    decimal totalMonths = 0;
-    foreach (var element in htmlElementList)
+    var node = htmlDocument.DocumentNode
+      .SelectNodes(xpath)
+      .SingleOrDefault(x => x.InnerText.Trim().Length > 0);
+    if (node != null)
     {
-      if (element.Name == "price")
-      {
-        totalPrice = element.Value;
-      } else if (element.Name == "months")
-      {
-        totalMonths += element.Value;
-      }
-      else
-      {
-        if (element.Value < 10)
-        {
-          totalMonths += element.Value;
-        }
-      }
-      
+      return GetDecimals(node.InnerText);
     }
-
-    newGymPriceInfo.GymName = this.Name;
-    newGymPriceInfo.TotalPrice = totalPrice;
-    newGymPriceInfo.PricePerMonth = Math.Round(totalPrice / totalMonths, 2);
-    newGymPriceInfo.TotalMonths = totalMonths;
-
-    // TODO: Add the logger function
-    Console.WriteLine("New Update:\n");
-    Console.WriteLine($"{newGymPriceInfo.GymName} \n" +
-                      $"- Price per month: {newGymPriceInfo.PricePerMonth}\n" +
-                      $"- Total months: {newGymPriceInfo.TotalMonths}\n" +
-                      $"- Total price: {newGymPriceInfo.TotalPrice}\n");
-
-    return newGymPriceInfo;
+    else
+    {
+      return 0;
+    }
   }
-
   public async Task<GymPriceInfoType> GetValue()
   {
     var fetcher = new HtmlFetcher(Url);
-    
-    HtmlDocument htmlDocument = await fetcher.GetHtmlDocAsync() ?? throw new InvalidOperationException();
+    HtmlDocument htmlDoc = new HtmlDocument();
+    try
+    {
+      htmlDoc = await fetcher.GetHtmlDocAsync() ?? throw new InvalidOperationException();
+    }
+    catch (Exception ex)
+    {
+      Console.WriteLine($"Error occured: {ex.Message}");
+
+    }
+
     
     foreach (var element in HtmlElementList)
     {
       try
       {
-        var node = htmlDocument.DocumentNode
-          .SelectNodes(element.Xpath)
-          .SingleOrDefault(x => x.InnerText.Trim().Length > 0);
-        if (node != null)
-        {
-          element.Value = GetDecimals(node.InnerText);
-          
-        }
-        
+        element.Value = ExtractNodeValue(ref htmlDoc, element.Xpath);
+
       }
       catch(Exception ex)
       {
@@ -108,8 +87,7 @@ public class BeActiveParser : IHtmlParser<GymPriceInfoType>
       }
       
     }
-    
-    
-    return CreateFromHtmlElement(HtmlElementList);
+
+    return _mapper.CreateFromHtmlElement(HtmlElementList);
   }
 }

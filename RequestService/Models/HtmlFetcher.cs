@@ -21,7 +21,7 @@ namespace RequestService.Models
     {
 
       var response = await _httpClient.GetAsync(Url);
-
+      
       if (response.StatusCode == HttpStatusCode.OK)
       {
         HtmlStringContent = await response.Content.ReadAsStringAsync();
