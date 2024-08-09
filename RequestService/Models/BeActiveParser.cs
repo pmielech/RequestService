@@ -1,12 +1,13 @@
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 using RequestService.Mappers;
+using RequestService.Models.GymMembershipType;
 
 namespace RequestService.Models;
 
 using Data;
 
-public class BeActiveParser : IHtmlParser<GymPriceInfoType>
+public class BeActiveParser : IHtmlParser<GymMembershipCreateVm>
 {
   private string Name { get; set; }
   private string Url { get; set; }
@@ -59,7 +60,7 @@ public class BeActiveParser : IHtmlParser<GymPriceInfoType>
       return 0;
     }
   }
-  public async Task<GymPriceInfoType> GetValue()
+  public async Task<GymMembershipCreateVm> GetValue()
   {
     var fetcher = new HtmlFetcher(Url);
     HtmlDocument htmlDoc = new HtmlDocument();
